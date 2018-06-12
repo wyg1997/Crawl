@@ -63,20 +63,23 @@ public class NewCrawl extends BreadthCrawler
 			return;
 		vis.put(url, true);
 
+		//Debug
+		System.out.println(url);
+
 		/*if page is news page*/
-		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/.*/.*\\\\.html"))
+		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/.*/.*/.*\\.html"))
 		{
 			//System.out.println("URL:\n" + url);
 			//System.out.println(page.html());
 
 			String schID = getSchoolID(url);
-			String item = page.selectText("option").split(" ")[0];
+			String item = getItem(page);
 
 			//Debug
-			System.out.println(schID);
-			System.out.println(item);
+//			System.out.println(schID);
+//			System.out.println(item);
 
-			String sql = "select '采集方式' from information;";
+			String sql = "SELECT 采集方式 FROM `information` WHERE 编号='"+item+"';";
 			int op = 0;
 			try
 			{
@@ -216,6 +219,16 @@ public class NewCrawl extends BreadthCrawler
 		}
 	}
 
+	private String getItem(Page page)
+	{
+		String item = "";
+		String[] items = page.selectTextList("h3").get(0).split(" ");
+		item = items[items.length-1];
+		int index = item.indexOf("：");
+		item = item.substring(index+1);
+		return item;
+	}
+
 	private void MultiTable(String schID, String item, Page page)
 	{
 
@@ -233,7 +246,7 @@ public class NewCrawl extends BreadthCrawler
 
 		NewCrawl crawler = new NewCrawl("crawl", true);
 		/*start crawl with depth of 4*/
-		crawler.start(2);
+		crawler.start(3);
 	}
 
 }
