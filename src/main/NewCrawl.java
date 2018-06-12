@@ -42,11 +42,24 @@ public class NewCrawl extends BreadthCrawler
 		//setResumable(true);
 	}
 
-	@Override
-	public void visit(Page page, CrawlDatums next)
+	public String getSchoolID(String url)
+	{
+		String schID = "";
+		String[] strings = url.split("/");
+		schID = strings[strings.length - 2];
+
+		//把学校和专业分开处理
+		if (schID.split("_").length == 2)
+			schID = schID.split("_")[0];
+		else
+			schID = schID.split("_")[0] + "_0";
+		return schID;
+	}
+
+	@Override public void visit(Page page, CrawlDatums next)
 	{
 		String url = page.url();
-		if (vis.get(url) != null && vis.get(url) == true)
+		if (vis.get(url) != null && vis.get(url))
 			return;
 		vis.put(url, true);
 
@@ -56,12 +69,41 @@ public class NewCrawl extends BreadthCrawler
 			//System.out.println("URL:\n" + url);
 			//System.out.println(page.html());
 
+			String schID = getSchoolID(url);
+			String item = page.selectText("option").split(" ")[0];
+
+			//Debug
+			System.out.println(schID);
+			System.out.println(item);
+
+			String sql = "select '采集方式' from information;";
+			int op = 0;
+			try
+			{
+				ArrayList<String> res = Mysql.select(sql);
+				if (res.get(0).equals("单项填报"))
+					op = 1;
+				else
+					op = 2;
+			}
+			catch (SQLException e)
+			{
+				e.printStackTrace();
+			}
+			if (op == 1)
+			{
+				Single(schID, item, page);
+			}
+			else
+			{
+				MultiTable(schID, item, page);
+			}
 		}
 		else if (page
 				.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/10078/10078_080901.html"))
 		{
 			//Debug
-//			System.out.println(url);
+			//			System.out.println(url);
 
 			String sql = "";
 			sql = "CREATE TABLE IF NOT EXISTS information" + "("
@@ -82,14 +124,14 @@ public class NewCrawl extends BreadthCrawler
 			for (String str : content)
 			{
 				//Debug
-//				System.out.println(str);
+				//				System.out.println(str);
 
 				String[] items = str.split(" ");
 
 				if (str.equals(content.get(0)) || items.length != 5)
 					continue;
 
-				sql = "INSERT INTO `information` VALUES ('" + items[0] + "','"
+				sql = "REPLACE INTO `information` VALUES ('" + items[0] + "','"
 						+ items[1] + "','" + items[2] + "');";
 				try
 				{
@@ -134,7 +176,7 @@ public class NewCrawl extends BreadthCrawler
 				if (strSchool.equals(content.get(0)))
 					continue;
 
-				sql = "INSERT INTO `schoolInfo` VALUES (";
+				sql = "REPLACE INTO `schoolInfo` VALUES (";
 
 				//Debug
 				//				System.out.println(strSchool);
@@ -172,6 +214,16 @@ public class NewCrawl extends BreadthCrawler
 			}
 
 		}
+	}
+
+	private void MultiTable(String schID, String item, Page page)
+	{
+
+	}
+
+	private void Single(String schID, String item, Page page)
+	{
+
 	}
 
 	public static void main(String[] args) throws Exception
