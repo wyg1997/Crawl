@@ -51,15 +51,18 @@ public class NewCrawl extends BreadthCrawler
 		vis.put(url, true);
 
 		/*if page is news page*/
-		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/.*/.*html"))
+		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/.*/.*\\\\.html"))
 		{
 			//System.out.println("URL:\n" + url);
 			//System.out.println(page.html());
 
 		}
 		else if (page
-				.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/10462/10462_080901_Q.html"))
+				.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/10078/10078_080901.html"))
 		{
+			//Debug
+//			System.out.println(url);
+
 			String sql = "";
 			sql = "CREATE TABLE IF NOT EXISTS information" + "("
 					+ "`编号` VARCHAR(5) PRIMARY KEY," + "`信息表名称` VARCHAR(80),"
@@ -79,15 +82,15 @@ public class NewCrawl extends BreadthCrawler
 			for (String str : content)
 			{
 				//Debug
-				System.out.println(str);
+//				System.out.println(str);
 
 				String[] items = str.split(" ");
 
 				if (str.equals(content.get(0)) || items.length != 5)
 					continue;
 
-				sql = "INSERT INTO `information` VALUES (" + items[0] + ","
-						+ items[1] + "," + items[2] + ");";
+				sql = "INSERT INTO `information` VALUES ('" + items[0] + "','"
+						+ items[1] + "','" + items[2] + "');";
 				try
 				{
 					Mysql.update(sql);
@@ -178,7 +181,7 @@ public class NewCrawl extends BreadthCrawler
 
 		NewCrawl crawler = new NewCrawl("crawl", true);
 		/*start crawl with depth of 4*/
-		crawler.start(1);
+		crawler.start(2);
 	}
 
 }
