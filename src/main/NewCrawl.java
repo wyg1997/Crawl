@@ -3,6 +3,7 @@ package main;
 import cn.edu.hfut.dmic.webcollector.model.CrawlDatums;
 import cn.edu.hfut.dmic.webcollector.model.Page;
 import cn.edu.hfut.dmic.webcollector.plugin.berkeley.BreadthCrawler;
+import com.sun.istack.internal.NotNull;
 import org.junit.Test;
 import sql.Mysql;
 
@@ -43,12 +44,8 @@ public class NewCrawl extends BreadthCrawler
 		//setResumable(true);
 	}
 
-	public String getSchoolID(String url)
+	public String getSchoolID(String schID)
 	{
-		String schID = "";
-		String[] strings = url.split("/");
-		schID = strings[strings.length - 2];
-
 		//把学校和专业分开处理
 		if (schID.split("_").length == 2)
 			schID = schID.split("_")[0];
@@ -67,13 +64,14 @@ public class NewCrawl extends BreadthCrawler
 		//Debug
 		System.out.println(url);
 
-		/*if page is news page*/
 		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/.*/.*/.*\\.html"))
+		//		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/10078/10078_080901/10078_080901_TK_ZYJK.html"))
 		{
 			//System.out.println("URL:\n" + url);
 			//System.out.println(page.html());
 
-			String schID = getSchoolID(url);
+			String schID = getSchoolID(url.split("/")[url.split("/").length
+					- 2]);
 			String item = getItem(page);
 			int cnt = 0;        //数据项数量
 
@@ -98,11 +96,11 @@ public class NewCrawl extends BreadthCrawler
 			{
 				e.printStackTrace();
 			}
-			if (op == 1)
+			if (op == 1 && cnt != 0)
 			{
 				Single(schID, item, page, cnt);
 			}
-			else
+			else if (op == 2 && cnt != 0)
 			{
 				MultiTable(schID, item, page, cnt);
 			}
@@ -115,8 +113,10 @@ public class NewCrawl extends BreadthCrawler
 
 			String sql = "";
 			sql = "CREATE TABLE IF NOT EXISTS `information`" + "("
-					+ "`编号` VARCHAR(5) PRIMARY KEY," + "`信息表名称` VARCHAR(80),"
-					+ "`采集方式` VARCHAR(10)," + "`数据项数量` INT" + ");";
+					+ "`高校代码` VARCHAR(20)," + "`编号` VARCHAR(5),"
+					+ "`信息表名称` VARCHAR(80)," + "`采集方式` VARCHAR(10),"
+					+ "`数据项数量` INT"
+					+ ",PRIMARY KEY (`高校代码`,`编号`),KEY `高校代码` (`编号`));";
 			try
 			{
 				Mysql.update(sql);
@@ -139,8 +139,19 @@ public class NewCrawl extends BreadthCrawler
 				if (str.equals(content.get(0)) || items.length != 5)
 					continue;
 
-				sql = "REPLACE INTO `information` VALUES ('" + items[0] + "','"
-						+ items[1] + "','" + items[2] + "', " + items[3] + ");";
+				//这里网页上数据有错，特判处理一下
+				if (items[0].equals("1.1"))
+					items[3] = "13";
+
+				String schID = "";
+				{
+					String[] strings = url.split("/");
+					schID = strings[strings.length - 1];
+					schID = getSchoolID(schID.substring(0, schID.length() - 5));
+				}
+				sql = "REPLACE INTO `information` VALUES ('" + schID + "','"
+						+ items[0] + "','" + items[1] + "','" + items[2] + "', "
+						+ items[3] + ");";
 				try
 				{
 					Mysql.update(sql);
@@ -173,8 +184,6 @@ public class NewCrawl extends BreadthCrawler
 				e.printStackTrace();
 				// TODO: handle exception
 			}
-
-			//ArrayList<String> datebase =  page.selectTextList("th");
 
 			String idLast = "";
 			ArrayList<String> content = page.selectTextList("tr");
@@ -236,7 +245,24 @@ public class NewCrawl extends BreadthCrawler
 
 	private void MultiTable(String schID, String item, Page page, int cnt)
 	{
-
+		//		ArrayList<String> trs = page.selectTextList("tr");
+		//
+		//		String sql = "CREATE TABLE IF NOT EXISTS `" + item + "`"
+		//				+ "(`高校代码` VARCHAR(20) PRIMARY KEY";
+		//		for (int i = 1; i <= cnt; i++)
+		//		{
+		//			String string = trs.get(i);
+		//			sql = sql + ",`" + string.split(" ")[0] + "` VARCHAR(1000)";
+		//		}
+		//		sql = sql + ");";
+		//		try
+		//		{
+		//			Mysql.update(sql);
+		//		}
+		//		catch (SQLException e)
+		//		{
+		//			e.printStackTrace();
+		//		}
 	}
 
 	/**
@@ -254,7 +280,7 @@ public class NewCrawl extends BreadthCrawler
 		for (int i = 1; i <= cnt; i++)
 		{
 			String string = trs.get(i);
-			sql = sql + ",`" + string.split(" ")[0] + "` VARCHAR(20)";
+			sql = sql + ",`" + string.split(" ")[0] + "` VARCHAR(1000)";
 		}
 		sql = sql + ");";
 		try
@@ -266,7 +292,21 @@ public class NewCrawl extends BreadthCrawler
 			e.printStackTrace();
 		}
 
-
+		sql = "INSERT IGNORE INTO `" + item + "` VALUES ('" + schID + "'";
+		for (int i = 1; i <= cnt; i++)
+		{
+			String string = trs.get(i);
+			sql = sql + ",'" + string.split(" ")[1] + "'";
+		}
+		sql = sql + ");";
+		try
+		{
+			Mysql.update(sql);
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+		}
 	}
 
 	public static void main(String[] args) throws Exception
@@ -279,5 +319,4 @@ public class NewCrawl extends BreadthCrawler
 		//set start depth
 		crawler.start(3);
 	}
-
 }
