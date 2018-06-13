@@ -3,6 +3,7 @@ package main;
 import cn.edu.hfut.dmic.webcollector.model.CrawlDatums;
 import cn.edu.hfut.dmic.webcollector.model.Page;
 import cn.edu.hfut.dmic.webcollector.plugin.berkeley.BreadthCrawler;
+import org.junit.Test;
 import sql.Mysql;
 
 import java.sql.SQLException;
@@ -74,17 +75,21 @@ public class NewCrawl extends BreadthCrawler
 
 			String schID = getSchoolID(url);
 			String item = getItem(page);
+			int cnt = 0;        //数据项数量
 
 			//Debug
-//			System.out.println(schID);
-//			System.out.println(item);
+			//			System.out.println(schID);
+			//			System.out.println(item);
 
-			String sql = "SELECT 采集方式 FROM `information` WHERE 编号='"+item+"';";
+			String sql =
+					"SELECT 采集方式,数据项数量 FROM `information` WHERE 编号='" + item
+							+ "';";
 			int op = 0;
 			try
 			{
 				ArrayList<String> res = Mysql.select(sql);
-				if (res.get(0).equals("单项填报"))
+				cnt = Integer.parseInt(res.get(0).split(" ")[1]);
+				if (res.get(0).split(" ")[0].equals("单项填报"))
 					op = 1;
 				else
 					op = 2;
@@ -95,11 +100,11 @@ public class NewCrawl extends BreadthCrawler
 			}
 			if (op == 1)
 			{
-				Single(schID, item, page);
+				Single(schID, item, page, cnt);
 			}
 			else
 			{
-				MultiTable(schID, item, page);
+				MultiTable(schID, item, page, cnt);
 			}
 		}
 		else if (page
@@ -109,9 +114,9 @@ public class NewCrawl extends BreadthCrawler
 			//			System.out.println(url);
 
 			String sql = "";
-			sql = "CREATE TABLE IF NOT EXISTS information" + "("
+			sql = "CREATE TABLE IF NOT EXISTS `information`" + "("
 					+ "`编号` VARCHAR(5) PRIMARY KEY," + "`信息表名称` VARCHAR(80),"
-					+ "`采集方式` VARCHAR(10)" + ");";
+					+ "`采集方式` VARCHAR(10)," + "`数据项数量` INT" + ");";
 			try
 			{
 				Mysql.update(sql);
@@ -135,7 +140,7 @@ public class NewCrawl extends BreadthCrawler
 					continue;
 
 				sql = "REPLACE INTO `information` VALUES ('" + items[0] + "','"
-						+ items[1] + "','" + items[2] + "');";
+						+ items[1] + "','" + items[2] + "', " + items[3] + ");";
 				try
 				{
 					Mysql.update(sql);
@@ -155,7 +160,7 @@ public class NewCrawl extends BreadthCrawler
 
 			//如果表不存在先建表
 			String sql = "";
-			sql = "CREATE TABLE IF NOT EXISTS schoolInfo" + "("
+			sql = "CREATE TABLE IF NOT EXISTS `schoolInfo`" + "("
 					+ "`高校代码` VARCHAR(20) PRIMARY KEY," + "`高校名称` VARCHAR(50),"
 					+ "`学制` VARCHAR(10)," + "`学位授予门类` VARCHAR(15),"
 					+ "`招生方式` VARCHAR(10)," + "`招生类型` VARCHAR(10)" + ");";
@@ -223,19 +228,44 @@ public class NewCrawl extends BreadthCrawler
 	{
 		String item = "";
 		String[] items = page.selectTextList("h3").get(0).split(" ");
-		item = items[items.length-1];
+		item = items[items.length - 1];
 		int index = item.indexOf("：");
-		item = item.substring(index+1);
+		item = item.substring(index + 1);
 		return item;
 	}
 
-	private void MultiTable(String schID, String item, Page page)
+	private void MultiTable(String schID, String item, Page page, int cnt)
 	{
 
 	}
 
-	private void Single(String schID, String item, Page page)
+	/**
+	 * 传入一个单项填报页面，创建数据表并插入数据
+	 * @param schID
+	 * @param item
+	 * @param page
+	 */
+	private void Single(String schID, String item, Page page, int cnt)
 	{
+		ArrayList<String> trs = page.selectTextList("tr");
+
+		String sql = "CREATE TABLE IF NOT EXISTS `" + item + "`"
+				+ "(`高校代码` VARCHAR(20) PRIMARY KEY";
+		for (int i = 1; i <= cnt; i++)
+		{
+			String string = trs.get(i);
+			sql = sql + ",`" + string.split(" ")[0] + "` VARCHAR(20)";
+		}
+		sql = sql + ");";
+		try
+		{
+			Mysql.update(sql);
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+		}
+
 
 	}
 
@@ -245,7 +275,8 @@ public class NewCrawl extends BreadthCrawler
 		Mysql.Creat();
 
 		NewCrawl crawler = new NewCrawl("crawl", true);
-		/*start crawl with depth of 4*/
+
+		//set start depth
 		crawler.start(3);
 	}
 
