@@ -4,12 +4,15 @@ import cn.edu.hfut.dmic.webcollector.model.CrawlDatums;
 import cn.edu.hfut.dmic.webcollector.model.Page;
 import cn.edu.hfut.dmic.webcollector.plugin.berkeley.BreadthCrawler;
 import com.sun.istack.internal.NotNull;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.junit.Test;
 import sql.Mysql;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.jsoup.nodes.Document;
 
@@ -21,7 +24,11 @@ public class NewCrawl extends BreadthCrawler
 	 * @param autoParse if autoParse is true,BreadthCrawler will auto extract
 	 *                  links which match regex rules from pag
 	 */
-	private HashMap<String, Boolean> vis = new HashMap<>();
+
+	private HashMap<String, Boolean> vis = new HashMap<>();        //记录爬过的网页
+	HashSet<String> base = new HashSet<>();        //简单表格
+	HashSet<String> complex = new HashSet<>();        //复杂表格(可能需手动创建)
+	HashSet<String> impossible = new HashSet<>();        //不能爬取的表格
 
 	public NewCrawl(String crawlPath, boolean autoParse)
 	{
@@ -37,6 +44,37 @@ public class NewCrawl extends BreadthCrawler
 		this.addRegex("-.*\\.(jpg|png|gif).*");
 		/*do not fetch url contains #*/
 		this.addRegex("-.*#.*");
+
+		base.add("1.2");
+		complex.add("2.1");
+		base.add("2.2");
+		base.add("3.2");
+		complex.add("3.3");
+		complex.add("3.5");
+		complex.add("3.8");
+		base.add("3.9");
+		complex.add("4.1");
+		base.add("4.2");
+		base.add("4.3");
+		base.add("4.4");
+		base.add("5.1");
+		impossible.add("5.2");
+		base.add("5.4");
+		impossible.add("6.1");
+		base.add("6.4");
+		base.add("6.5");
+		base.add("6.6");
+		impossible.add("6.7");
+		base.add("6.8");
+		base.add("6.9");
+		base.add("6.10");
+		base.add("8.1");
+		impossible.add("8.3");
+		impossible.add("8.4");
+		base.add("8.5");
+		base.add("8.6");
+		base.add("8.7");
+		base.add("8.13");
 
 		setThreads(50);
 		getConf().setTopN(100);
@@ -62,7 +100,7 @@ public class NewCrawl extends BreadthCrawler
 		vis.put(url, true);
 
 		//Debug
-		System.out.println(url);
+		//		System.out.println(url);
 
 		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/.*/.*/.*\\.html"))
 		//		if (page.matchUrl("http://zypt.neusoft.edu.cn/hasdb/pubfiles/gongshi2016/detail/10078/10078_080901/10078_080901_TK_ZYJK.html"))
@@ -243,26 +281,90 @@ public class NewCrawl extends BreadthCrawler
 		return item;
 	}
 
+	/**
+	 * 传入一个多项填报页面，创建数据表并插入数据
+	 * @param schID
+	 * @param item
+	 * @param page
+	 * @param cnt
+	 */
 	private void MultiTable(String schID, String item, Page page, int cnt)
 	{
-		//		ArrayList<String> trs = page.selectTextList("tr");
-		//
-		//		String sql = "CREATE TABLE IF NOT EXISTS `" + item + "`"
-		//				+ "(`高校代码` VARCHAR(20) PRIMARY KEY";
-		//		for (int i = 1; i <= cnt; i++)
-		//		{
-		//			String string = trs.get(i);
-		//			sql = sql + ",`" + string.split(" ")[0] + "` VARCHAR(1000)";
-		//		}
-		//		sql = sql + ");";
-		//		try
-		//		{
-		//			Mysql.update(sql);
-		//		}
-		//		catch (SQLException e)
-		//		{
-		//			e.printStackTrace();
-		//		}
+		String sql = "";
+		if (base.contains(item))
+		{
+			//建表
+			{
+				ArrayList<String> trs = page.selectTextList("tr");
+				String[] th = trs.get(0).split(" ");
+				sql = "CREATE TABLE IF NOT EXISTS `" + item + "`"
+						+ "(`高校代码` VARCHAR(20) PRIMARY KEY";
+				for (String s : th)
+					sql = sql + ",`" + s + "` VARCHAR(1000)";
+				sql = sql + ");";
+				try
+				{
+					Mysql.update(sql);
+				}
+				catch (SQLException e)
+				{
+					e.printStackTrace();
+				}
+			}
+
+			//因为可能存在空表格数据，只能手动解析网页
+			Elements trs = page.doc().select("table#collegeDataTable")
+					.select("tr");
+			for (Element tr : trs)
+			{
+				Elements tds = tr.select("td");
+
+				String string = "";
+				for (Element td : tds)
+				{
+					String text = td.text();
+					text = text.replaceAll(" ","_");
+					if (text.equals(""))
+					{
+						string += " null";
+					}
+					else
+					{
+						string += " " + text;
+					}
+				}
+				if (string.trim().equals(""))
+					continue;
+				String[] th = string.trim().split(" ");
+
+				sql = "INSERT IGNORE INTO `" + item + "` VALUES ('" + schID
+						+ "'";
+				for (String s : th)
+				{
+					s = s.replaceAll("'", "\"");
+					s = s.replaceAll("_"," ");
+					sql = sql + ",'" + s + "'";
+				}
+				sql = sql + ");";
+				try
+				{
+					Mysql.update(sql);
+				}
+				catch (SQLException e)
+				{
+					System.out.println(sql);
+					e.printStackTrace();
+				}
+			}
+		}
+		else if (complex.contains(item))
+		{
+
+		}
+		else if (impossible.contains(item))
+		{
+
+		}
 	}
 
 	/**
@@ -270,6 +372,7 @@ public class NewCrawl extends BreadthCrawler
 	 * @param schID
 	 * @param item
 	 * @param page
+	 * @param cnt
 	 */
 	private void Single(String schID, String item, Page page, int cnt)
 	{
